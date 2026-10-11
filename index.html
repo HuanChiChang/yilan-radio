@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>爸爸的收音機</title>
+<meta name="theme-color" content="#1b4332">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="收音機">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  :root {
+    --bg: #f6f4ee;
+    --card: #ffffff;
+    --ink: #1a1a1a;
+    --muted: #5c5c5c;
+    --accent: #1b4332;
+    --accent-ink: #ffffff;
+    --playing: #e9c46a;
+    --border: #d9d4c7;
+    --danger: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121412;
+      --card: #1e211e;
+      --ink: #f2f2f2;
+      --muted: #b5b5b5;
+      --accent: #74c69d;
+      --accent-ink: #0b1a12;
+      --playing: #e9c46a;
+      --border: #333833;
+      --danger: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 22px;
+    line-height: 1.4;
+    padding: 0 16px calc(170px + env(safe-area-inset-bottom));
+  }
+  header { padding: 20px 0 8px; }
+  h1 { font-size: 32px; margin: 0; }
+  .sub { color: var(--muted); font-size: 18px; margin-top: 4px; }
+  h2 { font-size: 22px; margin: 28px 0 10px; color: var(--muted); }
+  input[type=search] {
+    width: 100%; font-size: 22px; padding: 14px 16px; margin-top: 12px;
+    border: 2px solid var(--border); border-radius: 14px;
+    background: var(--card); color: var(--ink);
+  }
+  .list { display: flex; flex-direction: column; gap: 12px; }
+  .station {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--card); border: 2px solid var(--border); border-radius: 18px;
+    padding: 6px 6px 6px 18px; min-height: 84px;
+  }
+  .station.featured {
+    background: linear-gradient(135deg, #fff3c4, #ffe08a);
+    border: 3px solid #d4a017; color: #1a1a1a;
+  }
+  .station.featured .meta { color: #6b4e00; font-weight: 700; }
+  .station.featured .star { color: #8a6d00; }
+  .station.featured .name { font-size: 30px; }
+  .station.active { border-color: var(--playing); box-shadow: 0 0 0 3px var(--playing) inset; }
+  .station .play {
+    flex: 1; min-width: 0; text-align: left; background: none; border: 0; color: inherit;
+    font: inherit; padding: 10px 0; cursor: pointer;
+  }
+  .station .name { font-size: 26px; font-weight: 700; overflow-wrap: anywhere; }
+  .station .meta { font-size: 17px; color: var(--muted); }
+  .star {
+    flex: none; width: 64px; height: 64px; font-size: 34px; border: 0; border-radius: 14px;
+    background: transparent; color: var(--muted); cursor: pointer;
+  }
+  .star.on { color: #e0a800; }
+  .msg { color: var(--muted); padding: 12px 0; }
+  .player {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: var(--accent); color: var(--accent-ink);
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 -4px 16px rgba(0,0,0,.2);
+  }
+  .player .now { flex: 1; min-width: 0; }
+  .player .label { font-size: 17px; opacity: .85; }
+  .player .title { font-size: 26px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .player button {
+    flex: none; width: 96px; height: 96px; border-radius: 50%; border: 0;
+    background: var(--accent-ink); color: var(--accent); font-size: 22px; font-weight: 700; cursor: pointer;
+  }
+  .player button:disabled { opacity: .4; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📻 爸爸的收音機</h1>
+  <div class="sub">點電台名稱就會開始播放</div>
+  <input type="search" id="q" placeholder="找電台（例如：警廣、中廣）" autocomplete="off">
+</header>
+
+<section id="featuredSection">
+  <h2>📌 中原電台</h2>
+  <div class="list" id="featuredList"></div>
+</section>
+
+<section id="favSection" hidden>
+  <h2>⭐ 我的最愛</h2>
+  <div class="list" id="favList"></div>
+</section>
+
+<section>
+  <h2 id="allTitle">宜蘭與全台電台</h2>
+  <div class="list" id="allList"></div>
+  <div class="msg" id="msg">正在載入電台清單…</div>
+</section>
+
+<div class="player">
+  <div class="now">
+    <div class="label" id="status">尚未播放</div>
+    <div class="title" id="nowTitle">請選一個電台</div>
+  </div>
+  <button id="toggle" disabled aria-label="播放或停止">停止</button>
+</div>
+
+<audio id="audio" preload="none"></audio>
+
+<script>
+(() => {
+  const API_HOSTS = [
+    'de1.api.radio-browser.info',
+    'de2.api.radio-browser.info',
+    'fi1.api.radio-browser.info',
+    'nl1.api.radio-browser.info',
+  ];
+  const HLS_JS = 'https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js';
+
+  // Higher score = shown earlier. Yilan-local stations come first.
+  const PRIORITY = [
+    [100, /宜蘭|yilan|ilan|蘭陽|噶瑪蘭|kavalan|羅東|luodong|lotung/i],
+    [60,  /警察|警廣|police/i],
+    [50,  /中廣|bcc|中國廣播/i],
+    [45,  /教育|education/i],
+    [40,  /漢聲|voice of han/i],
+    [35,  /中央廣播|rti|radio taiwan/i],
+    [30,  /寶島|飛碟|ufo|好事|news ?98|愛樂|icrt|客家|hakka|原住民|alian/i],
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const audio = $('audio');
+  const store = {
+    get(key, fallback) {
+      try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+      catch { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+    },
+  };
+
+  let stations = [];
+  let favs = store.get('favs', []);   // stationuuid list
+  let current = null;
+  let hls = null;
+
+  // 中原廣播（宜蘭）— always pinned to the top with a highlighted card.
+  const FEATURED = /中原|chung ?yuan|zhong ?yuan/i;
+  const isFeatured = (s) => FEATURED.test(`${s.name} ${s.tags}`);
+
+  function score(s) {
+    const text = `${s.name} ${s.tags} ${s.state}`;
+    for (const [pts, re] of PRIORITY) if (re.test(text)) return pts;
+    return 0;
+  }
+
+  async function fetchStations() {
+    const query = 'stations/search?countrycode=TW&hidebroken=true&order=clickcount&reverse=true&limit=300';
+    for (const host of API_HOSTS) {
+      try {
+        const res = await fetch(`https://${host}/json/${query}`, { cache: 'no-store' });
+        if (res.ok) return await res.json();
+      } catch {}
+    }
+    throw new Error('all hosts failed');
+  }
+
+  function clean(raw) {
+    const https = location.protocol === 'https:';
+    const seen = new Set();
+    return raw
+      .map((s) => ({
+        id: s.stationuuid,
+        name: s.name.trim(),
+        url: s.url_resolved || s.url,
+        tags: s.tags || '',
+        state: s.state || '',
+        hls: s.hls === 1,
+        votes: s.votes || 0,
+      }))
+      // An https page cannot play http streams (mixed content).
+      .filter((s) => s.url && (!https || s.url.startsWith('https:')))
+      .filter((s) => !seen.has(s.name) && seen.add(s.name))
+      .map((s) => ({ ...s, score: score(s) }))
+      .sort((a, b) => b.score - a.score || b.votes - a.votes);
+  }
+
+  async function load() {
+    const cached = store.get('stations', null);
+    if (cached) { stations = cached; render(); }
+    try {
+      stations = clean(await fetchStations());
+      store.set('stations', stations);
+      $('msg').textContent = stations.length ? '' : '目前找不到可以播放的電台';
+    } catch {
+      $('msg').textContent = cached
+        ? '網路不穩，先顯示上次的電台清單'
+        : '載入失敗，請確認手機有連上網路，再重新打開';
+    }
+    render();
+  }
+
+  function card(s) {
+    const el = document.createElement('div');
+    el.className = 'station' + (isFeatured(s) ? ' featured' : '') + (current && current.id === s.id ? ' active' : '');
+    const play = document.createElement('button');
+    play.className = 'play';
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = s.name;
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = isFeatured(s) ? '⭐ 宜蘭在地・特別推薦' : s.score >= 100 ? '宜蘭在地' : (s.state || '');
+    play.append(name, meta);
+    play.onclick = () => playStation(s);
+    const star = document.createElement('button');
+    const isFav = favs.includes(s.id);
+    star.className = 'star' + (isFav ? ' on' : '');
+    star.textContent = isFav ? '★' : '☆';
+    star.setAttribute('aria-label', isFav ? '移出最愛' : '加入最愛');
+    star.onclick = () => toggleFav(s.id);
+    el.append(play, star);
+    return el;
+  }
+
+  function render() {
+    const q = $('q').value.trim().toLowerCase();
+    const match = (s) => !q || `${s.name} ${s.tags}`.toLowerCase().includes(q);
+    const favStations = favs.map((id) => stations.find((s) => s.id === id)).filter(Boolean);
+
+    const featured = stations.filter(isFeatured);
+    $('featuredSection').hidden = !!q;
+    if (featured.length) {
+      $('featuredList').replaceChildren(...featured.map(card));
+    } else {
+      const note = document.createElement('div');
+      note.className = 'station featured';
+      note.innerHTML = '<div class="play"><div class="name">中原電台</div>'
+        + '<div class="meta">目前網路上找不到它的串流，之後清單更新就會出現在這裡</div></div>';
+      $('featuredList').replaceChildren(note);
+    }
+
+    $('favSection').hidden = !favStations.length || !!q;
+    $('favList').replaceChildren(...favStations.map(card));
+    // The featured station already sits at the top, unless searching.
+    const rest = stations.filter((s) => match(s) && (q || !isFeatured(s)));
+    $('allList').replaceChildren(...rest.map(card));
+    $('allTitle').textContent = q ? '搜尋結果' : '宜蘭與全台電台';
+  }
+
+  function toggleFav(id) {
+    favs = favs.includes(id) ? favs.filter((f) => f !== id) : [...favs, id];
+    store.set('favs', favs);
+    render();
+  }
+
+  function loadHlsJs() {
+    if (window.Hls) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = HLS_JS;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.append(s);
+    });
+  }
+
+  function setStatus(label, title) {
+    $('status').textContent = label;
+    if (title !== undefined) $('nowTitle').textContent = title;
+  }
+
+  async function playStation(s) {
+    stop(false);
+    current = s;
+    store.set('last', s.id);
+    setStatus('連線中…', s.name);
+    $('toggle').disabled = false;
+    $('toggle').textContent = '停止';
+    render();
+
+    const isHls = s.hls || /\.m3u8(\?|$)/i.test(s.url);
+    try {
+      if (isHls && !audio.canPlayType('application/vnd.apple.mpegurl')) {
+        await loadHlsJs();
+        hls = new Hls();
+        hls.loadSource(s.url);
+        hls.attachMedia(audio);
+      } else {
+        audio.src = s.url;
+      }
+      await audio.play();
+    } catch {
+      if (current === s) {
+        setStatus('這個電台暫時無法播放，請換一台');
+        $('toggle').textContent = '播放';
+      }
+    }
+
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: s.name, artist: '爸爸的收音機' });
+      navigator.mediaSession.setActionHandler('play', () => playStation(s));
+      navigator.mediaSession.setActionHandler('pause', () => stop());
+      navigator.mediaSession.setActionHandler('stop', () => stop());
+    }
+  }
+
+  function stop(updateUi = true) {
+    if (hls) { hls.destroy(); hls = null; }
+    audio.pause();
+    audio.removeAttribute('src');
+    audio.load();
+    if (updateUi && current) {
+      setStatus('已停止');
+      $('toggle').textContent = '播放';
+    }
+  }
+
+  $('toggle').onclick = () => {
+    if (!current) return;
+    if (audio.paused) playStation(current); else stop();
+  };
+  audio.addEventListener('playing', () => setStatus('正在播放'));
+  audio.addEventListener('waiting', () => current && setStatus('緩衝中…'));
+  audio.addEventListener('error', () => current && audio.getAttribute('src') && setStatus('這個電台暫時無法播放，請換一台'));
+  $('q').addEventListener('input', render);
+
+  // Restore the last station name in the player bar (autoplay needs a tap).
+  const lastId = store.get('last', null);
+  load().then(() => {
+    const last = stations.find((s) => s.id === lastId);
+    if (last && !current) {
+      current = last;
+      setStatus('上次聽的電台', last.name);
+      $('toggle').disabled = false;
+      $('toggle').textContent = '播放';
+      render();
+    }
+  });
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
