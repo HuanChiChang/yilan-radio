@@ -171,6 +171,17 @@
   // 中原廣播（宜蘭）— always pinned to the top with a highlighted card.
   const FEATURED = /中原|chung ?yuan|zhong ?yuan/i;
   const isFeatured = (s) => FEATURED.test(`${s.name} ${s.tags}`);
+  // FM89.1 中原廣播電台（羅東）. Paste its online stream URL here once found.
+  const FEATURED_INFO = {
+    id: 'featured-zhongyuan',
+    name: '中原廣播電台 FM 89.1',
+    url: '',
+    tags: '中原',
+    state: 'Yilan',
+    hls: false,
+    votes: 0,
+    score: 100,
+  };
 
   function score(s) {
     const text = `${s.name} ${s.tags} ${s.state}`;
@@ -252,15 +263,16 @@
     const match = (s) => !q || `${s.name} ${s.tags}`.toLowerCase().includes(q);
     const favStations = favs.map((id) => stations.find((s) => s.id === id)).filter(Boolean);
 
-    const featured = stations.filter(isFeatured);
+    let featured = stations.filter(isFeatured);
+    if (!featured.length && FEATURED_INFO.url) featured = [FEATURED_INFO];
     $('featuredSection').hidden = !!q;
     if (featured.length) {
       $('featuredList').replaceChildren(...featured.map(card));
     } else {
       const note = document.createElement('div');
       note.className = 'station featured';
-      note.innerHTML = '<div class="play"><div class="name">中原電台</div>'
-        + '<div class="meta">目前網路上找不到它的串流，之後清單更新就會出現在這裡</div></div>';
+      note.innerHTML = '<div class="play"><div class="name">中原廣播電台 FM 89.1</div>'
+        + '<div class="meta">還沒找到網路收聽網址，可以先用收音機轉到 FM 89.1</div></div>';
       $('featuredList').replaceChildren(note);
     }
 
