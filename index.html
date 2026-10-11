@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>爸爸的收音機</title>
+<title>添祿的收音機</title>
 <meta name="theme-color" content="#1b4332">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="收音機">
@@ -99,7 +99,7 @@
 </head>
 <body>
 <header>
-  <h1>📻 爸爸的收音機</h1>
+  <h1>📻 添祿的收音機</h1>
   <div class="sub">點電台名稱就會開始播放</div>
   <input type="search" id="q" placeholder="找電台（例如：警廣、中廣）" autocomplete="off">
 </header>
@@ -322,7 +322,7 @@
     }
 
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: s.name, artist: '爸爸的收音機' });
+      navigator.mediaSession.metadata = new MediaMetadata({ title: s.name, artist: '添祿的收音機' });
       navigator.mediaSession.setActionHandler('play', () => playStation(s));
       navigator.mediaSession.setActionHandler('pause', () => stop());
       navigator.mediaSession.setActionHandler('stop', () => stop());

@@ -1,6 +1,6 @@
 // Caches the app shell so it opens even on a weak connection.
 // Radio streams and the station API always go to the network.
-const CACHE = 'radio-v1';
+const CACHE = 'radio-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
